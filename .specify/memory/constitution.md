@@ -1,50 +1,35 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+﻿# Ruinfall RogueLike Constitution
 
-## Core Principles
+## Core principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Maintainable code quality
+Write modular, readable code that favors composition over inheritance and documents non-obvious decisions inline.
+Keep feature specs synchronized with implementation status and remove dead code paths during refactors.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Test-first reliability (non-negotiable)
+Design each feature with explicit success, failure, and edge scenarios captured in `specs/NNN-short-title/tasks.md` before coding.
+Automate coverage with GUT suites under `src/tests/`, keep fixtures deterministic, and guard regressions with smoke scripts.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Cohesive player experience
+Preserve a consistent control scheme, UI language, and feedback cadence across scenes; new interactions must prototype UX copy and signaling in the spec.
+Accessibility defaults (readable fonts, adjustable audio, color-safe palettes) must be validated in manual checklists prior to acceptance.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Measurable performance budgets
+Budget frame time, memory, and load thresholds per scene, document them in the spec, and monitor with Godot profiler captures.
+Any change that risks a budget must ship with reproduction steps and remediation options before merge.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+## Delivery constraints
+- Adhere to Godot 4.x-compatible assets, scripts, and tooling checked into `src/` and `assets/`.
+- Scripts altering automation must be mirrored in `.specify/templates/` to keep scaffolding reproducible.
+- Secrets and environment configuration remain local via `.env` with required keys listed in non-functional requirements.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
-
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Workflow expectations
+Run `pwsh -File .specify\scripts\powershell\check-prerequisites.ps1 -Json` before reviews, update agent context after spec edits,
+and include performance plus UX validation results in PR descriptions. Code review approval requires green automated tests and a completed
+manual smoke log covering combat, inventory, and UI loops.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+This constitution supersedes conflicting guidance; amendments demand a documented rationale, reviewer consensus, and a migration plan covering code,
+tests, and player experience impacts. CI, reviewers, and agents must block merges that violate any core principle or delivery constraint.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2024-07-15 | **Last amended**: 2024-07-15
