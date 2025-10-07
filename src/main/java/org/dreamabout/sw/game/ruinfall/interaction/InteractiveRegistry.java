@@ -3,18 +3,30 @@ package org.dreamabout.sw.game.ruinfall.interaction;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Central registry of interactive objects with tile-based lookup and deterministic priority resolution.
  */
 public class InteractiveRegistry {
 
+    public interface Listener {
+        void onObjectMoved(String id, int oldX, int oldY, int newX, int newY, InteractiveRegistry registry);
+        void onObjectUnregistered(String id, int oldX, int oldY, InteractiveRegistry registry);
+    }
+
     private final ConcurrentMap<String, InteractiveObject> byId = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, LinkedHashSet<String>> tileMap = new ConcurrentHashMap<>();
+    private final List<Listener> listeners = new CopyOnWriteArrayList<>();
+
+    public void addListener(Listener l){ if(l!=null) listeners.add(l);}
+    public void removeListener(Listener l){ if(l!=null) listeners.remove(l);}
 
     private static long key(int x, int y) {
         return ((long) x << 32) | (y & 0xffffffffL);
     }
+    private static int keyX(long k){ return (int)(k >> 32); }
+    private static int keyY(long k){ return (int)k; }
 
     public void register(InteractiveObject obj) {
         Objects.requireNonNull(obj, "obj");
@@ -27,10 +39,15 @@ public class InteractiveRegistry {
     public void unregister(String id) {
         InteractiveObject removed = byId.remove(id);
         if (removed != null) {
-            LinkedHashSet<String> set = tileMap.get(key(removed.getTileX(), removed.getTileY()));
+            int oldX = removed.getTileX();
+            int oldY = removed.getTileY();
+            LinkedHashSet<String> set = tileMap.get(key(oldX, oldY));
             if (set != null) {
                 set.remove(id);
-                if (set.isEmpty()) tileMap.remove(key(removed.getTileX(), removed.getTileY()));
+                if (set.isEmpty()) tileMap.remove(key(oldX, oldY));
+            }
+            for (Listener l : listeners) {
+                l.onObjectUnregistered(id, oldX, oldY, this);
             }
         }
     }
@@ -38,16 +55,44 @@ public class InteractiveRegistry {
     public void moveObject(String id, int newX, int newY) {
         InteractiveObject obj = byId.get(id);
         if (obj == null) return;
-        int oldX = obj.getTileX();
-        int oldY = obj.getTileY();
-        if (oldX == newX && oldY == newY) return;
-        LinkedHashSet<String> oldSet = tileMap.get(key(oldX, oldY));
-        if (oldSet != null) {
-            oldSet.remove(id);
-            if (oldSet.isEmpty()) tileMap.remove(key(oldX, oldY));
+        int currentX = obj.getTileX();
+        int currentY = obj.getTileY();
+        boolean adapterAlreadyUpdated = (currentX == newX && currentY == newY);
+
+        int oldX = currentX; int oldY = currentY; boolean changed = true;
+
+        if (!adapterAlreadyUpdated) {
+            LinkedHashSet<String> oldSet = tileMap.get(key(currentX, currentY));
+            if (oldSet != null) {
+                oldSet.remove(id);
+                if (oldSet.isEmpty()) tileMap.remove(key(currentX, currentY));
+            }
+            obj.setTilePosition(newX, newY);
+        } else {
+            long targetKey = key(newX, newY);
+            LinkedHashSet<String> targetSet = tileMap.get(targetKey);
+            boolean alreadyIndexedAtTarget = targetSet != null && targetSet.contains(id);
+            if (!alreadyIndexedAtTarget) {
+                // find old location (scan) and remove
+                for (Map.Entry<Long, LinkedHashSet<String>> e : tileMap.entrySet()) {
+                    if (e.getKey() == targetKey) continue;
+                    LinkedHashSet<String> set = e.getValue();
+                    if (set.remove(id)) {
+                        if (set.isEmpty()) tileMap.remove(e.getKey());
+                        oldX = keyX(e.getKey());
+                        oldY = keyY(e.getKey());
+                        break;
+                    }
+                }
+            } else {
+                changed = false; // no move actually happened
+            }
         }
-        obj.setTilePosition(newX, newY);
+        if (!changed) return;
         tileMap.computeIfAbsent(key(newX, newY), k -> new LinkedHashSet<>()).add(id);
+        for (Listener l : listeners) {
+            l.onObjectMoved(id, oldX, oldY, newX, newY, this);
+        }
     }
 
     public List<InteractiveObject> getStackAt(int x, int y) {
@@ -57,13 +102,13 @@ public class InteractiveRegistry {
         List<InteractiveObject> enemies = new ArrayList<>();
         List<InteractiveObject> npcs = new ArrayList<>();
         List<InteractiveObject> chests = new ArrayList<>();
-        for (String id : set) {
-            InteractiveObject obj = byId.get(id);
-            if (obj == null) continue; // defensive
-            switch (obj.getType()) {
-                case ENEMY -> enemies.add(obj);
-                case NPC -> npcs.add(obj);
-                case CHEST -> chests.add(obj);
+        for (String oid : set) {
+            InteractiveObject o = byId.get(oid);
+            if (o == null) continue; // defensive
+            switch (o.getType()) {
+                case ENEMY -> enemies.add(o);
+                case NPC -> npcs.add(o);
+                case CHEST -> chests.add(o);
             }
         }
         List<InteractiveObject> out = new ArrayList<>(enemies.size() + npcs.size() + chests.size());

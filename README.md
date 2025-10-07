@@ -43,5 +43,12 @@ TDD suite covers generation connectivity, room counts, LOS, fog transitions, dam
 enemy movement, restart flow, performance budgets, interaction contracts, and UI placement
 edge cases.
 
+## Recent Hover / Nameplate Improvements (Feature 003)
+- Added HoverMath for deterministic cursor→tile mapping with viewport offsets.
+- Hover auto-refreshes on object movement (enter/leave hovered tile) and camera scroll.
+- Stale hover invalidates on removal or movement away (fallback to next stack object or clear).
+- Performance guard ensures only active tile stack inspected (O(k)).
+- Nameplate & highlight update without requiring extra mouse movement.
+
 ## License
 See LICENSE.
