@@ -94,6 +94,14 @@ public class RuinfallApp extends GameApplication {
     private Node mainMenuNode;
     private boolean runStarting = false;
 
+    // ESC handling services (pause/menu layering to be expanded in later tasks T048+)
+    private final NavigationStateService navigationStateService = new NavigationStateService();
+    private final OverlayStackService overlayStackService = new OverlayStackService();
+    private final DialogState dialogState = new DialogState();
+    private final ESCDebounceState escDebounceState = new ESCDebounceState(200);
+    private final TelemetryLogger escTelemetry = new TelemetryLogger(TelemetryConfig::isEnabled);
+    private ESCInputHandler escInputHandler;
+
     @Override
     protected void initSettings(GameSettings settings) {
         settings.setWidth(1280);
@@ -105,6 +113,7 @@ public class RuinfallApp extends GameApplication {
 
     @Override
     protected void initGame() {
+        escInputHandler = new ESCInputHandler(navigationStateService, overlayStackService, dialogState, escDebounceState, escTelemetry);
         // Instead of generating dungeon immediately, show main menu first
         showMainMenu();
     }
@@ -541,7 +550,8 @@ public class RuinfallApp extends GameApplication {
         FXGL.onKey(KeyCode.A, () -> movePlayer(-1, 0));
         FXGL.onKey(KeyCode.D, () -> movePlayer(1, 0));
         FXGL.onKeyDown(KeyCode.R, this::restartRun);
-        FXGL.onKeyDown(KeyCode.ESCAPE, this::handleEscape);
+        // Replaced legacy ESC binding with new unified handler (T047)
+        FXGL.onKeyDown(KeyCode.ESCAPE, this::handleEscKey);
 
         FXGL.getGameScene().getRoot().addEventHandler(MouseEvent.MOUSE_MOVED, this::handleMouseMove);
         FXGL.getGameScene().getRoot().addEventHandler(MouseEvent.MOUSE_PRESSED, this::handleMousePressed);
@@ -645,7 +655,27 @@ public class RuinfallApp extends GameApplication {
         return tileX >= 0 && tileY >= 0 && tileX < dungeonWidthTiles && tileY < dungeonHeightTiles;
     }
 
-    private void handleEscape() {
+    private void handleEscKey() {
+        if (escInputHandler == null) {
+            handleEscapeLegacy();
+            return;
+        }
+        var action = escInputHandler.handleEsc();
+        switch (action) {
+            case DIALOG_DISMISS -> System.out.println("[ESC] Dialog dismissed");
+            case OVERLAY_CLOSE -> System.out.println("[ESC] Overlay closed");
+            case CUTSCENE_INTERRUPT_OPEN_MENU, OPEN_MENU -> System.out.println("[ESC] Pause menu open (stub)");
+            case SUBMENU_BACK -> System.out.println("[ESC] Pause submenu back (stub)");
+            case RESUME_GAMEPLAY -> System.out.println("[ESC] Resume gameplay (stub)");
+            case IGNORED, NO_OP -> {
+                // Fall back to legacy UI layering (context menu / selection / exit arming)
+                handleEscapeLegacy();
+            }
+        }
+    }
+
+    // Renamed from handleEscape for legacy fallback logic
+    private void handleEscapeLegacy() {
         if (stackMenuNode != null && stackMenuNode.isVisible()) {
             stackMenuNode.hide();
             System.out.println("[UI] ESC: stack menu hidden");
@@ -663,7 +693,6 @@ public class RuinfallApp extends GameApplication {
             System.out.println("[UI] ESC: selection cleared");
             return;
         }
-        // Exit arm logic
         if (!exitArmed) {
             exitArmed = true;
             System.out.println("[UI] ESC: exit armed (press ESC again to exit)");

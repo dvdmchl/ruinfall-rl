@@ -21,6 +21,24 @@ new interactive object system from feature 002:
 - Mouse wheel: cycle hovered stack without opening the menu
 - ESC: close context menu, then clear selection, else exit
 
+## ESC Key Behavior (Feature 005)
+Precedence-driven, debounced (>=200ms) logic resolves exactly one action per press:
+Order of consideration:
+1. Transition active -> IGNORED (no state change)
+2. Dialog open -> dismiss dialog
+3. Any overlay(s) open -> close top overlay
+4. Cutscene active -> interrupt & open pause menu
+5. No menu open -> open pause menu (depth=1)
+6. Menu depth >1 -> navigate back (depth-1)
+7. Menu depth ==1 -> resume gameplay
+8. Otherwise -> NO_OP (nothing to do)
+
+Telemetry records each meaningful action (excluding IGNORED / NO_OP) when enabled.
+
+## Telemetry
+In-memory logger (temporary) captures EscActionType + timestamp.
+Enable/disable via `TelemetryConfig.setEnabled(boolean)` in tests (default enabled).
+
 ## Build
 ```
 mvn clean verify
