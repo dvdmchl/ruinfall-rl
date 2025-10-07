@@ -17,6 +17,10 @@ public class InteractionUIController {
 
     private final PrintStream logStream;
 
+    private double lastMouseSceneX = Double.NaN;
+    private double lastMouseSceneY = Double.NaN;
+    private int tileSize = 16; // default; overridden by app
+
     public InteractionUIController(InteractiveRegistry registry, SelectionManager selectionManager, HoverManager hoverManager) {
         this(registry, selectionManager, hoverManager, System.out);
     }
@@ -26,6 +30,21 @@ public class InteractionUIController {
         this.selectionManager = selectionManager;
         this.hoverManager = hoverManager;
         this.logStream = logStream;
+        // Attach hover manager as listener for movement/removal refresh logic
+        registry.addListener(hoverManager);
+    }
+
+    public void setTileSize(int tileSize) { if (tileSize > 0) this.tileSize = tileSize; }
+
+    public void setLastMouseScenePosition(double sceneX, double sceneY) {
+        this.lastMouseSceneX = sceneX;
+        this.lastMouseSceneY = sceneY;
+    }
+
+    public void refreshHoverFromStoredCursor(double viewportX, double viewportY) {
+        if (Double.isNaN(lastMouseSceneX) || Double.isNaN(lastMouseSceneY)) return;
+        HoverMath.TileCoord tc = HoverMath.mapCursorToTile(lastMouseSceneX, lastMouseSceneY, viewportX, viewportY, tileSize);
+        hoverManager.onHoverTile(tc.x(), tc.y(), registry);
     }
 
     public void onMouseMoveTile(int x, int y) {

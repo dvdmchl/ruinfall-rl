@@ -14,6 +14,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 import org.dreamabout.sw.game.ruinfall.interaction.*;
 import org.dreamabout.sw.game.ruinfall.localization.Messages;
 import org.dreamabout.sw.game.ruinfall.model.*;
@@ -76,6 +77,7 @@ public class RuinfallApp extends GameApplication {
     private StackMenuNode stackMenuNode;
 
     private boolean interactionNodesAttached = false;
+    private boolean exitArmed = false; // press ESC twice (within window) to exit cleanly
 
     @Override
     protected void initSettings(GameSettings settings) {
@@ -144,6 +146,7 @@ public class RuinfallApp extends GameApplication {
         selectionManager = new SelectionManager();
         hoverManager = new HoverManager();
         interactionController = new InteractionUIController(interactiveRegistry, selectionManager, hoverManager);
+        interactionController.setTileSize(TILE_SIZE);
         registerInteractiveObjects();
         hoverManager.onHoverTile(-1, -1, interactiveRegistry);
         selectionManager.clear();
@@ -441,6 +444,9 @@ public class RuinfallApp extends GameApplication {
         }
         enemyInteractive.setTilePosition(enemy.getX(), enemy.getY());
         interactiveRegistry.moveObject(enemyInteractive.getId(), enemy.getX(), enemy.getY());
+        // viewport may shift due to binding -> recompute hover from stored cursor
+        var vp = FXGL.getGameScene().getViewport();
+        interactionController.refreshHoverFromStoredCursor(vp.getX(), vp.getY());
         visibilitySystem.recomputeVisibility(dungeon, player.getX(), player.getY(), 8);
         refreshTileVisibility();
         updateEntityPositions();
@@ -528,9 +534,11 @@ public class RuinfallApp extends GameApplication {
         if (interactionController == null) {
             return;
         }
-        if (isInsideMap(event.getX(), event.getY())) {
-            int tileX = (int) (event.getX() / TILE_SIZE);
-            int tileY = (int) (event.getY() / TILE_SIZE);
+        var vp = FXGL.getGameScene().getViewport();
+        interactionController.setLastMouseScenePosition(event.getX(), event.getY());
+        var tc = HoverMath.mapCursorToTile(event.getX(), event.getY(), vp.getX(), vp.getY(), TILE_SIZE);
+        int tileX = tc.x(); int tileY = tc.y();
+        if (tileX >=0 && tileY >=0 && tileX < dungeonWidthTiles && tileY < dungeonHeightTiles) {
             interactionController.onMouseMoveTile(tileX, tileY);
         } else {
             interactionController.onMouseMoveTile(-1, -1);
@@ -545,7 +553,10 @@ public class RuinfallApp extends GameApplication {
         if (stackMenuNode != null) {
             stackMenuNode.hide();
         }
-        boolean insideMap = isInsideMap(event.getX(), event.getY());
+        var vp = FXGL.getGameScene().getViewport();
+        var tc = HoverMath.mapCursorToTile(event.getX(), event.getY(), vp.getX(), vp.getY(), TILE_SIZE);
+        int tileX = tc.x(); int tileY = tc.y();
+        boolean insideMap = tileX >=0 && tileY >=0 && tileX < dungeonWidthTiles && tileY < dungeonHeightTiles;
         if (!insideMap) {
             if (event.getButton() == MouseButton.PRIMARY || event.getButton() == MouseButton.SECONDARY) {
                 interactionController.onOutsideClick();
@@ -553,22 +564,21 @@ public class RuinfallApp extends GameApplication {
             }
             return;
         }
-        int tileX = (int) (event.getX() / TILE_SIZE);
-        int tileY = (int) (event.getY() / TILE_SIZE);
         switch (event.getButton()) {
             case PRIMARY -> {
                 interactionController.onLeftClickTile(tileX, tileY, this::isInteractiveVisible);
+                System.out.println("[UI] Left click tile=" + tileX + "," + tileY);
                 refreshInteractionUI();
             }
             case SECONDARY -> {
                 interactionController.onRightClickTile(tileX, tileY, this::isInteractiveVisible);
+                System.out.println("[UI] Right click tile=" + tileX + "," + tileY + " ctxOpened=" + (interactionController.getContextMenuModel()!=null));
                 refreshInteractionUI();
             }
             case MIDDLE -> {
                 openStackMenu(tileX, tileY);
             }
-            default -> {
-            }
+            default -> { }
         }
     }
 
@@ -601,6 +611,7 @@ public class RuinfallApp extends GameApplication {
             refreshInteractionUI();
             return;
         }
+        System.out.println("[UI] Opening stack menu at tile=" + tileX + "," + tileY + " size=" + stack.size());
         stackMenuNode.show(stack, tileX, tileY, TILE_SIZE, FXGL.getAppWidth(), FXGL.getAppHeight(), sidePanelStartX, obj -> {
             if (selectionManager != null) {
                 selectionManager.select(obj);
@@ -617,21 +628,32 @@ public class RuinfallApp extends GameApplication {
     }
 
     private void handleEscape() {
-        if (stackMenuNode != null) {
+        if (stackMenuNode != null && stackMenuNode.isVisible()) {
             stackMenuNode.hide();
+            System.out.println("[UI] ESC: stack menu hidden");
+            return;
         }
-        if (interactionController != null) {
-            if (interactionController.getContextMenuModel() != null) {
-                interactionController.closeContextMenu();
-                refreshInteractionUI();
-                return;
-            }
-            if (selectionManager != null && selectionManager.getState().selectedId() != null) {
-                selectionManager.clear();
-                refreshInteractionUI();
-                return;
-            }
+        if (interactionController != null && interactionController.getContextMenuModel() != null) {
+            interactionController.closeContextMenu();
+            refreshInteractionUI();
+            System.out.println("[UI] ESC: context menu closed");
+            return;
         }
+        if (selectionManager != null && selectionManager.getState().selectedId() != null) {
+            selectionManager.clear();
+            refreshInteractionUI();
+            System.out.println("[UI] ESC: selection cleared");
+            return;
+        }
+        // Exit arm logic
+        if (!exitArmed) {
+            exitArmed = true;
+            System.out.println("[UI] ESC: exit armed (press ESC again to exit)");
+            FXGL.getNotificationService().pushNotification("Press ESC again to exit");
+            FXGL.runOnce(() -> exitArmed = false, Duration.seconds(2));
+            return;
+        }
+        System.out.println("[UI] ESC: exiting game");
         FXGL.getGameController().exit();
     }
 
