@@ -1,10 +1,25 @@
 # Ruinfall Roguelike (Minimal Core)
 
-Implements the minimal single-level roguelike core (feature 001-build-a-minimal):
-- Procedural rooms + corridors (seeded)
-- One player, one roaming enemy
-- LOS radius 8 with fog-of-war (UNSEEN/MEMORY/VISIBLE)
-- Contact damage, HP 5 → death overlay (restart with R)
+Implements the minimal single-level roguelike core (feature 001-build-a-minimal) plus the
+new interactive object system from feature 002:
+- Procedural rooms and corridors (seeded) with player + roaming enemy
+- LOS radius 8 with fog-of-war (UNSEEN / MEMORY / VISIBLE)
+- Contact damage, HP 5, death overlay (`R` to restart)
+- Interactive objects (enemies, chests, NPCs) with hover nameplates, selection highlight,
+  and a side panel of localized details
+- Context menus for selected objects; placeholder actions log attempts and surface toast
+  feedback while Inspect remains enabled
+- Middle-click stack menu to resolve overlapping objects and pick a new selection
+- ESC prioritises closing context menus, then clearing selection, before exiting
+
+## Controls
+- Arrow / WASD: move the player (throttled for held input)
+- Mouse move: hover objects to preview nameplates
+- Left click: select visible object or clear selection when clicking empty tiles
+- Right click: select (if needed) and open the context menu
+- Middle click: open stack menu when multiple interactives occupy the tile
+- Mouse wheel: cycle hovered stack without opening the menu
+- ESC: close context menu, then clear selection, else exit
 
 ## Build
 ```
@@ -15,7 +30,7 @@ mvn clean verify
 ```
 mvn -DskipTests exec:java -Dexec.mainClass=org.dreamabout.sw.game.ruinfall.RuinfallApp -- -seed=12345
 ```
-(Use `--seed=` for deterministic generation.)
+Use `--seed=` for deterministic generation.
 
 ## Performance Logging
 Enable timing logs:
@@ -24,8 +39,9 @@ mvn -Druinfall.debugPerf=true -DskipTests exec:java -Dexec.mainClass=org.dreamab
 ```
 
 ## Tests
-TDD suite covers generation connectivity, room counts, LOS, fog transitions, damage cadence, enemy movement, restart flow, and performance budgets.
+TDD suite covers generation connectivity, room counts, LOS, fog transitions, damage cadence,
+enemy movement, restart flow, performance budgets, interaction contracts, and UI placement
+edge cases.
 
 ## License
 See LICENSE.
-
