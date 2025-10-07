@@ -5,7 +5,7 @@ import com.almasb.fxgl.app.GameSettings;
 import com.almasb.fxgl.dsl.FXGL;
 import com.almasb.fxgl.entity.Entity;
 import javafx.scene.Node;
-import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.DropShadow; // may be unused now
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -15,11 +15,23 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
 import javafx.util.Duration;
+// Added imports for main menu UI
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Button;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+
 import org.dreamabout.sw.game.ruinfall.interaction.*;
 import org.dreamabout.sw.game.ruinfall.localization.Messages;
 import org.dreamabout.sw.game.ruinfall.model.*;
 import org.dreamabout.sw.game.ruinfall.system.*;
 import org.dreamabout.sw.game.ruinfall.ui.*;
+import org.dreamabout.sw.game.ruinfall.system.SeedUtil; // added import
 
 import java.util.HashSet;
 import java.util.Random;
@@ -54,7 +66,7 @@ public class RuinfallApp extends GameApplication {
     private Entity chestEntity;
     private Entity npcEntity;
     private Rectangle[][] tileRects;
-    private Text seedText;
+    private Text seedText; // retained for compatibility but no longer used (FR-014)
     private Node sidePanelNode;
     private double sidePanelStartX;
 
@@ -78,6 +90,9 @@ public class RuinfallApp extends GameApplication {
 
     private boolean interactionNodesAttached = false;
     private boolean exitArmed = false; // press ESC twice (within window) to exit cleanly
+    private String currentSeedString; // uppercase alphanumeric ≤16
+    private Node mainMenuNode;
+    private boolean runStarting = false;
 
     @Override
     protected void initSettings(GameSettings settings) {
@@ -90,55 +105,140 @@ public class RuinfallApp extends GameApplication {
 
     @Override
     protected void initGame() {
-        parseSeed();
-        generateAndInit();
+        // Instead of generating dungeon immediately, show main menu first
+        showMainMenu();
     }
 
-    private void parseSeed() {
+    // Removed parseSeed() direct call from initGame. System property still can influence initial seed.
+    private void initDefaultSeedIfNeeded() {
+        if (currentSeedString != null) return;
         Long sys = Long.getLong("ruinfall.seed", null);
         if (sys != null) {
-            seed = sys;
-            deterministicSeed = true;
+            currentSeedString = SeedUtil.toSeedStringFromLong(sys);
         } else {
-            seed = System.currentTimeMillis();
-            deterministicSeed = false;
+            currentSeedString = SeedUtil.random(rng);
         }
     }
 
-    private void generateAndInit() {
+    private void showMainMenu() {
+        teardownGameWorld();
+        initDefaultSeedIfNeeded();
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(32));
+        root.setAlignment(Pos.TOP_LEFT);
+        Label title = new Label("Ruinfall");
+        title.setStyle("-fx-font-size: 32px; -fx-text-fill: white; -fx-font-weight: bold;");
+        HBox seedRow = new HBox(8);
+        seedRow.setAlignment(Pos.CENTER_LEFT);
+        Label seedLabel = new Label("World Seed:");
+        seedLabel.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
+        TextField seedField = new TextField(currentSeedString);
+        seedField.setPrefColumnCount(18);
+        seedField.textProperty().addListener((obs, oldV, newV) -> {
+            String sanitized = SeedUtil.sanitize(newV);
+            if (!sanitized.equals(newV.toUpperCase())) {
+                int caret = seedField.getCaretPosition();
+                seedField.setText(sanitized);
+                seedField.positionCaret(Math.min(caret, sanitized.length()));
+            }
+            currentSeedString = seedField.getText();
+        });
+        Button randomizeBtn = new Button("Randomize");
+        randomizeBtn.setOnAction(e -> {
+            currentSeedString = SeedUtil.random(rng);
+            seedField.setText(currentSeedString);
+        });
+        Button copyBtn = new Button("Copy");
+        copyBtn.setOnAction(e -> {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(currentSeedString);
+            Clipboard.getSystemClipboard().setContent(content);
+            FXGL.getNotificationService().pushNotification("Seed copied");
+        });
+        seedRow.getChildren().addAll(seedLabel, seedField, randomizeBtn, copyBtn);
+
+        HBox actionRow = new HBox(12);
+        actionRow.setAlignment(Pos.CENTER_LEFT);
+        Button startBtn = new Button("Start Run");
+        startBtn.setDefaultButton(true);
+        startBtn.setOnAction(e -> startRun());
+        Button exitBtn = new Button("Exit");
+        exitBtn.setOnAction(e -> FXGL.getGameController().exit());
+        actionRow.getChildren().addAll(startBtn, exitBtn);
+
+        Label hint = new Label("Enter up to 16 letters/numbers. Same seed reproduces world.");
+        hint.setStyle("-fx-text-fill: gray; -fx-font-size: 12px;");
+
+        root.getChildren().addAll(title, seedRow, actionRow, hint);
+        root.setStyle("-fx-background-color: linear-gradient(to bottom,#111,#222); -fx-border-color: #444; -fx-border-width: 0 0 0 0;");
+        mainMenuNode = root;
+        FXGL.getGameScene().addUINode(mainMenuNode);
+    }
+
+    private void startRun() {
+        if (runStarting) return; // FR-012 guard
+        runStarting = true;
+        if (currentSeedString == null || currentSeedString.isBlank()) {
+            currentSeedString = SeedUtil.random(rng);
+        }
+        currentSeedString = SeedUtil.sanitize(currentSeedString);
+        if (mainMenuNode != null) {
+            FXGL.getGameScene().removeUINode(mainMenuNode);
+            mainMenuNode = null;
+        }
+        seed = SeedUtil.derive(currentSeedString);
+        deterministicSeed = true; // now user visible seed drives determinism
+        generateAndInit();
+        runStarting = false;
+    }
+
+    private void teardownGameWorld() {
         FXGL.getGameWorld().getEntitiesCopy().forEach(Entity::removeFromWorld);
         if (sidePanelNode != null) {
             FXGL.getGameScene().removeUINode(sidePanelNode);
             sidePanelNode = null;
         }
-        if (seedText != null) {
-            FXGL.getGameScene().removeUINode(seedText);
-            seedText = null;
+        if (interactionNodesAttached) {
+            if (auraHighlight != null) FXGL.getGameScene().removeUINode(auraHighlight);
+            if (nameplateNode != null) FXGL.getGameScene().removeUINode(nameplateNode);
+            if (contextMenuNode != null) FXGL.getGameScene().removeUINode(contextMenuNode);
+            if (stackMenuNode != null) FXGL.getGameScene().removeUINode(stackMenuNode);
+            interactionNodesAttached = false;
         }
+        tileRects = null;
+        playerEntity = null; enemyEntity = null; chestEntity = null; npcEntity = null;
+    }
 
+    private void generateAndInit() {
+        // world clearing handled in teardownGameWorld before menu; ensure clean
+        FXGL.getGameWorld().getEntitiesCopy().forEach(Entity::removeFromWorld);
         turnSystem.reset();
         int visibleTilesY = FXGL.getAppHeight() / TILE_SIZE;
         dungeonHeightTiles = Math.min(48, Math.max(visibleTilesY - 1, 10));
         dungeonWidthTiles = 64;
-
         dungeon = generator.generate(seed, dungeonWidthTiles, dungeonHeightTiles);
         player = new Player(dungeon.getPlayerSpawnX(), dungeon.getPlayerSpawnY(), 5);
         enemy = new Enemy(dungeon.getEnemySpawnX(), dungeon.getEnemySpawnY());
-
         setupInteractionSystems();
-
         visibilitySystem.recomputeVisibility(dungeon, player.getX(), player.getY(), 8);
         buildTileEntities();
         spawnActors();
         configureViewport();
         hud.initHUD(player);
         createOrUpdateSidePanel();
-        seedText = buildSeedText();
-        addUINode(seedText);
-        positionSeedText();
         refreshTileVisibility();
         updateActorVisibility();
         refreshInteractionUI();
+    }
+
+    // Removed seed text build & position; refreshTileVisibility no longer repositions it
+    private void refreshTileVisibility() {
+        if (dungeon == null || tileRects == null) return;
+        for (int y = 0; y < dungeon.getHeight(); y++) {
+            for (int x = 0; x < dungeon.getWidth(); x++) {
+                updateTileColor(x, y);
+            }
+        }
     }
 
     private void setupInteractionSystems() {
@@ -252,82 +352,6 @@ public class RuinfallApp extends GameApplication {
         return ((long) x << 32) | (y & 0xffffffffL);
     }
 
-    private Text buildSeedText() {
-        Text t = new Text("Seed: " + seed + " (" + dungeonWidthTiles + "x" + dungeonHeightTiles + ")");
-        t.setFill(Color.WHITE);
-        t.setEffect(new DropShadow(4, Color.color(0, 0, 0, 0.85)));
-        t.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-        return t;
-    }
-
-    private void positionSeedText() {
-        if (seedText == null) {
-            return;
-        }
-        int mapPixelWidth = dungeonWidthTiles * TILE_SIZE;
-        if (sidePanelNode != null) {
-            seedText.setTranslateX(mapPixelWidth + 16);
-            seedText.setTranslateY(32);
-        } else {
-            seedText.setTranslateX(10);
-            seedText.setTranslateY(24);
-        }
-    }
-
-    private void createOrUpdateSidePanel() {
-        int mapPixelWidth = dungeonWidthTiles * TILE_SIZE;
-        sidePanelStartX = mapPixelWidth;
-        int totalWidth = FXGL.getAppWidth();
-        int panelWidth = totalWidth - mapPixelWidth;
-        if (panelWidth <= 0) {
-            sidePanelNode = null;
-            return;
-        }
-        sidePanelController.setPrefWidth(panelWidth);
-        sidePanelController.setMaxWidth(panelWidth);
-        sidePanelController.setPrefHeight(FXGL.getAppHeight());
-        StackPane container = new StackPane(sidePanelController);
-        container.setPrefSize(panelWidth, FXGL.getAppHeight());
-        container.setTranslateX(mapPixelWidth);
-        container.setTranslateY(0);
-        container.setStyle("-fx-background-color: rgba(10,10,12,0.95); -fx-border-color: rgba(255,255,255,0.12); -fx-border-width: 0 0 0 1;");
-        if (sidePanelNode != null) {
-            FXGL.getGameScene().removeUINode(sidePanelNode);
-        }
-        sidePanelNode = container;
-        addUINode(sidePanelNode);
-    }
-
-    private void configureViewport() {
-        var vp = FXGL.getGameScene().getViewport();
-        vp.setBounds(0, 0, dungeonWidthTiles * TILE_SIZE, dungeonHeightTiles * TILE_SIZE);
-        boolean taller = dungeonHeightTiles * TILE_SIZE > FXGL.getAppHeight();
-        boolean wider = dungeonWidthTiles * TILE_SIZE > FXGL.getAppWidth();
-        if (taller || wider) {
-            vp.bindToEntity(playerEntity, FXGL.getAppWidth() / 2.0, FXGL.getAppHeight() / 2.0);
-        } else {
-            vp.unbind();
-            vp.setX(0);
-            vp.setY(0);
-        }
-    }
-
-    private void buildTileEntities() {
-        tileRects = new Rectangle[dungeon.getHeight()][dungeon.getWidth()];
-        for (int y = 0; y < dungeon.getHeight(); y++) {
-            for (int x = 0; x < dungeon.getWidth(); x++) {
-                Rectangle r = new Rectangle(TILE_SIZE, TILE_SIZE);
-                tileRects[y][x] = r;
-                updateTileColor(x, y);
-                FXGL.entityBuilder()
-                        .at(x * TILE_SIZE, y * TILE_SIZE)
-                        .view(r)
-                        .type(EntityType.TILE)
-                        .buildAndAttach();
-            }
-        }
-    }
-
     private void updateTileColor(int x, int y) {
         Tile t = dungeon.getTile(x, y);
         Rectangle r = tileRects[y][x];
@@ -336,15 +360,6 @@ public class RuinfallApp extends GameApplication {
             case MEMORY -> r.setFill(t.getType() == TileType.WALL ? Color.color(0.12, 0.12, 0.15) : Color.color(0.25, 0.25, 0.25));
             case UNSEEN -> r.setFill(Color.BLACK);
         }
-    }
-
-    private void refreshTileVisibility() {
-        for (int y = 0; y < dungeon.getHeight(); y++) {
-            for (int x = 0; x < dungeon.getWidth(); x++) {
-                updateTileColor(x, y);
-            }
-        }
-        positionSeedText();
     }
 
     private void spawnActors() {
@@ -441,6 +456,9 @@ public class RuinfallApp extends GameApplication {
         if (player.getHp() == 0) {
             turnSystem.endRun();
             hud.showGameOver();
+            // Return to main menu after run ends (scenario 6)
+            FXGL.runOnce(this::showMainMenu, Duration.seconds(1));
+            return;
         }
         enemyInteractive.setTilePosition(enemy.getX(), enemy.getY());
         interactiveRegistry.moveObject(enemyInteractive.getId(), enemy.getX(), enemy.getY());
@@ -677,13 +695,64 @@ public class RuinfallApp extends GameApplication {
     }
 
     private void restartRun() {
-        if (!deterministicSeed) {
-            seed = System.currentTimeMillis();
-        }
+        // Restart with same seed (FR-011 persistence within session)
         hud.hideGameOver();
         generateAndInit();
     }
 
+    private void createOrUpdateSidePanel() {
+        int mapPixelWidth = dungeonWidthTiles * TILE_SIZE;
+        sidePanelStartX = mapPixelWidth;
+        int totalWidth = FXGL.getAppWidth();
+        int panelWidth = totalWidth - mapPixelWidth;
+        if (panelWidth <= 0) {
+            sidePanelNode = null;
+            return;
+        }
+        sidePanelController.setPrefWidth(panelWidth);
+        sidePanelController.setMaxWidth(panelWidth);
+        sidePanelController.setPrefHeight(FXGL.getAppHeight());
+        StackPane container = new StackPane(sidePanelController);
+        container.setPrefSize(panelWidth, FXGL.getAppHeight());
+        container.setTranslateX(mapPixelWidth);
+        container.setTranslateY(0);
+        container.setStyle("-fx-background-color: rgba(10,10,12,0.95); -fx-border-color: rgba(255,255,255,0.12); -fx-border-width: 0 0 0 1;");
+        if (sidePanelNode != null) {
+            FXGL.getGameScene().removeUINode(sidePanelNode);
+        }
+        sidePanelNode = container;
+        addUINode(sidePanelNode);
+    }
+
+    private void configureViewport() {
+        var vp = FXGL.getGameScene().getViewport();
+        vp.setBounds(0, 0, dungeonWidthTiles * TILE_SIZE, dungeonHeightTiles * TILE_SIZE);
+        boolean taller = dungeonHeightTiles * TILE_SIZE > FXGL.getAppHeight();
+        boolean wider = dungeonWidthTiles * TILE_SIZE > FXGL.getAppWidth();
+        if (taller || wider) {
+            vp.bindToEntity(playerEntity, FXGL.getAppWidth() / 2.0, FXGL.getAppHeight() / 2.0);
+        } else {
+            vp.unbind();
+            vp.setX(0);
+            vp.setY(0);
+        }
+    }
+
+    private void buildTileEntities() {
+        tileRects = new Rectangle[dungeon.getHeight()][dungeon.getWidth()];
+        for (int y = 0; y < dungeon.getHeight(); y++) {
+            for (int x = 0; x < dungeon.getWidth(); x++) {
+                Rectangle r = new Rectangle(TILE_SIZE, TILE_SIZE);
+                tileRects[y][x] = r;
+                updateTileColor(x, y);
+                FXGL.entityBuilder()
+                        .at(x * TILE_SIZE, y * TILE_SIZE)
+                        .view(r)
+                        .type(EntityType.TILE)
+                        .buildAndAttach();
+            }
+        }
+    }
     public static void main(String[] args) {
         launch(args);
     }
