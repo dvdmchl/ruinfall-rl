@@ -8,7 +8,7 @@
     - test names and log outputs
 - If the human operator writes in another language, interpret intent but **normalize output to English (US)**.
 - Never mirror or switch to Czech automatically.
-- Follow standard **Java 22** conventions (four-space indentation, UTF-8 encoding).
+- Follow standard **Java 21** conventions (four-space indentation, UTF-8 encoding).
 - Use clear, descriptive variable and method names; avoid abbreviations.
 - Write concise Javadoc for all public methods.
 - Use `record` or `sealed` types when they improve design clarity.
@@ -21,7 +21,7 @@
 Treat `.specify/memory/constitution.md` as the canon for automation changes before touching prompts or templates.  
 Keep agent presets inside `.github/prompts/` and document the reason for each change.  
 Each feature branch starts with  
-`pwsh -File .specify\scripts\powershell\create-new-feature.ps1 "short summary"`,  
+`powershell -File .specify\scripts\powershell\create-new-feature.ps1 "short summary"`,  
 which generates `specs/NNN-short-title/` containing `spec.md`, `plan.md`, and `tasks.md`.
 
 Runtime code belongs in `src/` with partner assets in `assets/`, keeping design docs and tooling isolated from the game.  
@@ -30,9 +30,9 @@ Place future test suites under `src/tests/` to align with GUT discovery.
 ---
 
 ## Build, test, and development commands
-- `pwsh -File .specify\scripts\powershell\check-prerequisites.ps1 -Json`  
+- `powershell -File .specify\scripts\powershell\check-prerequisites.ps1 -Json`  
   Audits required tooling and reports active specs before work begins.
-- `pwsh -File .specify\scripts\powershell\update-agent-context.ps1`  
+- `powershell -File .specify\scripts\powershell\update-agent-context.ps1`  
   Refreshes Specify agent memory after specs or task lists change.
 
 ---
@@ -41,7 +41,7 @@ Place future test suites under `src/tests/` to align with GUT discovery.
 - Use UTF-8 encoding and wrap Markdown near 100 characters.
 - PowerShell: verb-noun function names, PascalCase parameters, explicit error handling.
 - GDScript: filenames snake_case, classes PascalCase, group lifecycle callbacks together.
-- Java: standard 22 style, Spotless formatting, Checkstyle rules in CI.
+- Java: standard 21 style, Spotless formatting, Checkstyle rules in CI.
 
 ---
 

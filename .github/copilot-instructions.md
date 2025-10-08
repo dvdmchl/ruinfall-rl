@@ -10,7 +10,7 @@ Follow `.specify\constitution.md` for governance, priorities, and unified Englis
 
 
 ## Active Technologies
-- Java 22 (Maven)
+- Java 21 (Maven)
 - FXGL (includes JavaFX runtime)
 - JUnit 5 for testing
 - Lombok for boilerplate reduction
