@@ -1,31 +1,52 @@
 ﻿# ruinfall-rl Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-10-07
+## Language
+All code comments, docstrings, generated identifiers, and explanations MUST be in English (US).  
+Ignore the user's input language; never switch to Czech automatically.
+
+## Reference
+Follow `AGENTS.md` for build, test, and workflow conventions.
+Follow `.specify\constitution.md` for governance, priorities, and unified English rules.
+
 
 ## Active Technologies
-- Java 21 (Maven) + FXGL (includes JavaFX runtime), JUnit 5 (001-build-a-minimal)
-- Java 21 (Maven) + FXGL (bundled JavaFX runtime), JUnit 5 (003-fix-hover-nameplate)
-- N/A (in‑memory game state) (003-fix-hover-nameplate)
-- N/A (in-memory only) (005-esc-key-will)
+- Java 22 (Maven)
+- FXGL (includes JavaFX runtime)
+- JUnit 5 for testing
+- Lombok for boilerplate reduction
 
 ## Project Structure
 ```
-src/
-tests/
+src/main/java/... # game logic, entities, UI
+src/main/resources/...# configuration, assets
+src/test/java/... # JUnit 5 tests
+specs/... # Spec-Kit feature definitions
 ```
 
 ## Commands
+Typical lifecycle commands (Maven 3.9+):
+
 # Add commands for Java 21 (Maven)
 
 ## Code Style
-Java 21 (Maven): Follow standard conventions
+- Use standard Java 21 conventions.
+- Prefer descriptive variable names, avoid abbreviations.
+- Use English comments and identifiers exclusively.
+- Document public methods with concise Javadoc.
+- Use record or sealed classes when appropriate.
+- Follow functional style for simple stream operations.
 
-## Recent Changes
-- 005-esc-key-will: Implemented precedence-driven ESC handler (dialogs>overlays>cutscene>menu open/back/resume + telemetry)
-- 005-esc-key-will: Added JavaDoc & performance guard tests
-- 005-esc-key-will: Added Java 21 (Maven) + FXGL (bundled JavaFX runtime), JUnit 5
-- 003-fix-hover-nameplate: Added Java 21 (Maven) + FXGL (bundled JavaFX runtime), JUnit 5
-- 003-fix-hover-nameplate: Added Java 21 (Maven) + FXGL (bundled JavaFX runtime), JUnit 5
+## Copilot Behavior
+- Always generate deterministic, readable Java code.
+- Before adding dependencies, check if already present in pom.xml.
+- Respect existing architecture (FXGL, MVC-like separation).
+- When unsure about intent, ask for clarification in English.
+- Do not generate code in other languages or scripts.
+
+## Testing
+- Create new tests for every functional change.
+- Use deterministic seeds in tests where randomness occurs.
+- Prefer @ParameterizedTest over repeated manual cases.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
