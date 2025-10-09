@@ -105,6 +105,11 @@ When adjusting automation, confirm compatibility with `.specify/templates/` so n
 - Avoid any I/O outside the project (network/files) unless explicitly required by tests.
 - Keep generated code deterministic and idempotent across runs.
 - Ask for clarification in English if intent is ambiguous.
+- REUSE-FIRST: Search and adapt existing components before creating new ones.
+- Do NOT create new controllers/scenes/styles unless the current spec includes `rfc.md` with `EXEMPTION: APPROVED`.
+- Respect the Change Budget (`specs/NNN/change-budget.yml`). If absent, apply defaults (≤3 added files, ≤300 LOC, 0 new packages).
+- For UI: reuse existing overlay/widgets and CSS classes; new UI files are forbidden by default.
+- Before adding any file, run the Reuse Checklist and record the result in `specs/NNN/reuse-report.md`.
 
 ---
 
@@ -114,4 +119,8 @@ When adjusting automation, confirm compatibility with `.specify/templates/` so n
 - ✅ All code comments and identifiers are in English (US).
 - ✅ Spotless and Checkstyle pass without violations.
 - ✅ README / CHANGELOG updated.
-- ✅ No unauthorized dependencies added.  
+- ✅ No unauthorized dependencies added.
+- ✅ Reuse report present (`specs/NNN/reuse-report.md`) listing considered components and the chosen adaptation.
+- ✅ Change Budget respected (CI check green).
+- ✅ No new controllers/scenes/styles unless RFC exemption is present.
+

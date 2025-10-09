@@ -37,6 +37,28 @@ This rule ensures consistency, facilitates review, and prevents fragmented termi
 > When the human communicates in a non-English language, the agent SHALL interpret the intent but MUST respond and produce all artifacts strictly in English (US).  
 > Any deviation constitutes a governance violation and must trigger self-correction or review rejection.
 
+### V. Reuse-First Principle (binding)
+Before adding new modules, scenes, controllers, services, styles, or assets, agents MUST:
+1) Discover and list candidate components in the repository that can satisfy the need (search by type, name, package, style class).
+2) Propose an adaptation plan that reuses the closest fit with minimal code changes.
+3) Proceed with reuse and thin adapters by default.
+
+Creating a NEW subsystem (new top-level package, scene graph, controller family, or stylesheet) is **forbidden** unless an explicit exemption is granted via a Design RFC (see “Expansion Protocol”).
+
+### VI. Expansion Protocol
+A new subsystem MAY be introduced only if:
+- `specs/NNN-.../rfc.md` exists with: problem statement, reused options considered, reasons each failed, and blast radius.
+- The RFC contains the line: `EXEMPTION: APPROVED` and is reviewed by CODEOWNERS.
+- The change stays within the per-iteration Change Budget.
+
+Without that RFC and approval token, agents MUST NOT create new subsystems.
+
+### VII. Change Budget (default)
+Unless overridden by the current spec’s `change-budget.yml`, the iteration is limited to:
+- ≤ 3 added files, ≤ 300 added LOC, 0 new packages.
+- No new files matching `*Controller.java`, `*Scene.java`, `*.css`, `*.fxml`.
+  Breach = governance violation; CI MUST fail the merge.
+
 ---
 
 ## Language Enforcement Protocol
